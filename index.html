@@ -350,28 +350,29 @@ function isNight(dt){
 }
 
 // Classify each minute of a shift, return breakdown.
-// Priority: heilag overrides natt; helg overrides natt. Heilag + helg can overlap.
-// heilag counts every heilag minute (incl. overlap). helgEx counts helg minutes NOT in heilag.
-// heilagHelg is the overlap. natt/dag are exclusive. heilag + helgEx + natt + dag = shiftH.
+// Priority: heilag overrides helg (exclusive). Heilag does NOT override natt — both can apply.
+// Helg overrides natt. Invariant: heilag + helg + dag + nattExclusive = shiftH.
+// natt counts both nattExclusive and heilag∩natt overlap, so heilag+helg+natt+dag may exceed shiftH.
 function classifyMinutes(start,end,holidayWindows){
-  let heilag=0,helgEx=0,heilagHelg=0,natt=0,dag=0;
+  let heilag=0,helg=0,natt=0,dag=0;
   let cur=new Date(start);
   while(cur<end){
     const h=!!isInHolidayWindow(cur,holidayWindows);
     const w=isWeekend(cur);
+    const n=isNight(cur);
     if(h){
       heilag+=1;
-      if(w) heilagHelg+=1;
+      if(n) natt+=1;
     }else if(w){
-      helgEx+=1;
-    }else if(isNight(cur)){
+      helg+=1;
+    }else if(n){
       natt+=1;
     }else{
       dag+=1;
     }
     cur=new Date(cur.getTime()+60000);
   }
-  return{heilag:heilag/60,helgEx:helgEx/60,heilagHelg:heilagHelg/60,natt:natt/60,dag:dag/60};
+  return{heilag:heilag/60,helg:helg/60,natt:natt/60,dag:dag/60};
 }
 
 function getWeekKey(d){
@@ -486,9 +487,7 @@ function recalc(){
 
     const yr=s.start.getFullYear();
     const hw=getHolidayWindows(yr);
-    const{heilag,helgEx,heilagHelg,natt,dag}=classifyMinutes(s.start,s.end,hw);
-    // Helg allowance applies both to pure helg hours and heilag/helg overlap
-    const helg=helgEx+heilagHelg;
+    const{heilag,helg,natt,dag}=classifyMinutes(s.start,s.end,hw);
 
     // Overtime for this shift
     const wk=getWeekKey(s.start);
@@ -506,10 +505,9 @@ function recalc(){
     // Heilagdag 100% tillegg brukar rHeilag (§5.5d, fast divisor 162.5)
     const heilagOt=heilag*rHeilag*1.0;
 
-    // Vekeovertid: timar over grensa. Use exclusive buckets so fractions sum to ≤1.
-    // Overlap (heilagHelg) is billed at heilag rate for OT (higher rate wins).
+    // Vekeovertid: timar over grensa. heilag og helg er eksklusive, so summen er ≤1.
     const heilagFraction=heilag/shiftH;
-    const helgFraction=helgEx/shiftH;
+    const helgFraction=helg/shiftH;
     const otHeilag=otH*heilagFraction;
     const otHelg=otH*helgFraction;
     const otDag=otH-otHeilag-otHelg;
