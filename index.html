@@ -238,6 +238,7 @@ const PROXY='https://ics-proxy.tahaahmed421.workers.dev/';
 let allShifts=[],activeMonth='';
 
 const UNPAID_KEYWORDS=['UBETFERIE','UBETALT FERIE','UNPAID'];
+const HEILAG_BASE=38302.14/162.5; // ~235.71 kr/t per §5.5d
 
 function fmt(n){return'kr '+Math.round(n).toLocaleString('nb-NO')}
 function fmtH(n){return n.toFixed(1).replace('.',',')+' t'}
@@ -432,8 +433,8 @@ function recalc(){
     // Ubekvem tillegg (natt og helg kun)
     const tillegg=natt*rNatt+helg*rHelg;
 
-    // Heilagdag = overtid 100% (i tillegg til grunnlønn)
-    const heilagOt=heilag*rBase*1.0;
+    // Heilagdag 100% tillegg brukar HEILAG_BASE (§5.5d, fast divisor 162.5)
+    const heilagOt=heilag*HEILAG_BASE*1.0;
 
     // Vekeovertid: timar over grensa
     const heilagFraction=heilag/shiftH;
@@ -441,7 +442,7 @@ function recalc(){
     const otHeilag=otH*heilagFraction;
     const otHelg=otH*helgFraction;
     const otDag=otH-otHeilag-otHelg;
-    const otPay=otDag*rBase*0.5+(otHeilag+otHelg)*rBase*1.0;
+    const otPay=otDag*rBase*0.5+otHelg*rBase*1.0+otHeilag*HEILAG_BASE*1.0;
 
     const lon=grunn+tillegg+heilagOt+otPay;
     totH+=shiftH; totGrunn+=grunn; totTillegg+=tillegg; totOvertid+=heilagOt+otPay;
