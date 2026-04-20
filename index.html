@@ -138,6 +138,30 @@ tr.sum-row:hover{background:transparent !important}
 #resultCard{animation:fadeIn 0.3s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;animation:fadeIn 0.2s ease;backdrop-filter:blur(2px)}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;max-width:420px;width:90%;max-height:90vh;overflow-y:auto;position:relative}
+.modal-close{position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--text-2);font-size:22px;cursor:pointer;width:32px;height:32px;padding:0;line-height:1;border-radius:6px;transition:all 0.15s ease;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:#1e2235;color:var(--text)}
+.modal h3{font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px;padding-right:28px;letter-spacing:-0.01em}
+.modal .mdate{font-size:13px;color:var(--text-2);margin-bottom:2px;text-transform:capitalize}
+.modal .mtime{font-size:13px;color:var(--text-2);margin-bottom:1rem;font-family:'JetBrains Mono',monospace}
+.mtable{width:100%;border-collapse:collapse;font-size:13px;margin-top:.75rem}
+.mtable th{font-size:10px;color:var(--text-2);text-align:left;padding:8px 8px;border-bottom:1px solid var(--border);font-weight:500;text-transform:uppercase;letter-spacing:.04em;background:transparent}
+.mtable td{padding:7px 8px;color:var(--text);border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:13px}
+.mtable td:first-child{font-family:'Inter',sans-serif}
+.mtable td:last-child,.mtable th:last-child,.mtable td:nth-child(2),.mtable th:nth-child(2),.mtable td:nth-child(3),.mtable th:nth-child(3){text-align:right}
+.mtotals{margin-top:1rem;padding-top:1rem;border-top:2px solid var(--accent)}
+.mtotrow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-family:'JetBrains Mono',monospace;font-size:14px}
+.mtotrow .lbl{font-family:'Inter',sans-serif;color:var(--text-2)}
+.mtotrow.brutto{font-size:15px;font-weight:600;color:var(--text)}
+.mtotrow.brutto .lbl{color:var(--text);font-weight:500}
+.mtotrow.netto{font-size:17px;font-weight:600;color:var(--ok);margin-top:4px}
+.mtotrow.netto .lbl{color:var(--ok);font-weight:600}
+.mtotrow.skatt{color:var(--text-2)}
+
+tbody tr[data-idx]{cursor:pointer}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
 .footer{text-align:center;font-size:11px;color:var(--text-2);margin-top:2rem;padding:1rem 0;letter-spacing:0.02em}
 
 @media(max-width:767px){
@@ -160,6 +184,8 @@ tr.sum-row:hover{background:transparent !important}
   table{min-width:480px}
   .month-btn{height:36px;padding:0 14px}
   .hide-mobile{display:none !important}
+  .overlay{align-items:flex-end;padding:0}
+  .modal{max-width:none;width:100%;border-radius:14px 14px 0 0;max-height:85vh;animation:slideUp 0.25s ease;border-bottom:none}
 }
 </style>
 </head>
@@ -250,9 +276,17 @@ tr.sum-row:hover{background:transparent !important}
 
 </div>
 
+<div id="detailOverlay" class="overlay" style="display:none" onclick="closeDetail(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeDetail()" aria-label="Lukk">×</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
 <script>
 const PROXY='https://ics-proxy.tahaahmed421.workers.dev/';
 let allShifts=[],activeMonth='';
+const shiftDetails=new Map();
 
 const UNPAID_KEYWORDS=['UBETFERIE','UBETALT FERIE','UNPAID'];
 
@@ -315,18 +349,29 @@ function isNight(dt){
   return h>=21||h<6;
 }
 
-// Classify each minute of a shift, return breakdown
+// Classify each minute of a shift, return breakdown.
+// Priority: heilag overrides natt; helg overrides natt. Heilag + helg can overlap.
+// heilag counts every heilag minute (incl. overlap). helgEx counts helg minutes NOT in heilag.
+// heilagHelg is the overlap. natt/dag are exclusive. heilag + helgEx + natt + dag = shiftH.
 function classifyMinutes(start,end,holidayWindows){
-  let heilag=0,helg=0,natt=0,dag=0;
+  let heilag=0,helgEx=0,heilagHelg=0,natt=0,dag=0;
   let cur=new Date(start);
   while(cur<end){
-    if(isInHolidayWindow(cur,holidayWindows)) heilag+=1;
-    else if(isWeekend(cur)) helg+=1;
-    else if(isNight(cur)) natt+=1;
-    else dag+=1;
+    const h=!!isInHolidayWindow(cur,holidayWindows);
+    const w=isWeekend(cur);
+    if(h){
+      heilag+=1;
+      if(w) heilagHelg+=1;
+    }else if(w){
+      helgEx+=1;
+    }else if(isNight(cur)){
+      natt+=1;
+    }else{
+      dag+=1;
+    }
     cur=new Date(cur.getTime()+60000);
   }
-  return{heilag:heilag/60,helg:helg/60,natt:natt/60,dag:dag/60};
+  return{heilag:heilag/60,helgEx:helgEx/60,heilagHelg:heilagHelg/60,natt:natt/60,dag:dag/60};
 }
 
 function getWeekKey(d){
@@ -421,9 +466,10 @@ function recalc(){
   let totOtH=0,totOtKr=0;
   const tbody=document.getElementById('shiftBody');
   tbody.innerHTML='';
+  shiftDetails.clear();
   const h1=n=>n.toFixed(1).replace('.',',');
 
-  filtered.forEach(s=>{
+  filtered.forEach((s,idx)=>{
     const isUnpaid=UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw));
     const shiftH=(s.end-s.start)/3600000;
     const dato=s.start.toLocaleDateString('nn-NO',{weekday:'short',day:'numeric',month:'short'});
@@ -440,7 +486,9 @@ function recalc(){
 
     const yr=s.start.getFullYear();
     const hw=getHolidayWindows(yr);
-    const{heilag,helg,natt,dag}=classifyMinutes(s.start,s.end,hw);
+    const{heilag,helgEx,heilagHelg,natt,dag}=classifyMinutes(s.start,s.end,hw);
+    // Helg allowance applies both to pure helg hours and heilag/helg overlap
+    const helg=helgEx+heilagHelg;
 
     // Overtime for this shift
     const wk=getWeekKey(s.start);
@@ -458,9 +506,10 @@ function recalc(){
     // Heilagdag 100% tillegg brukar rHeilag (§5.5d, fast divisor 162.5)
     const heilagOt=heilag*rHeilag*1.0;
 
-    // Vekeovertid: timar over grensa
+    // Vekeovertid: timar over grensa. Use exclusive buckets so fractions sum to ≤1.
+    // Overlap (heilagHelg) is billed at heilag rate for OT (higher rate wins).
     const heilagFraction=heilag/shiftH;
-    const helgFraction=helg/shiftH;
+    const helgFraction=helgEx/shiftH;
     const otHeilag=otH*heilagFraction;
     const otHelg=otH*helgFraction;
     const otDag=otH-otHeilag-otHelg;
@@ -483,6 +532,15 @@ function recalc(){
 
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">${h1(natt)}</td><td class="hide-mobile">${h1(helg)}</td><td class="hide-mobile">${h1(heilag)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td>`;
+    tr.dataset.idx=idx;
+    tr.onclick=()=>openDetail(idx);
+    shiftDetails.set(idx,{
+      sum:s.sum,start:s.start,end:s.end,
+      shiftH,natt,helg,heilag,dag,
+      otH,otDag,otHelg,otHeilag,
+      rBase,rNatt,rHelg,rHeilag,
+      grunn,tillegg,heilagOt,otPay,lon
+    });
     tbody.appendChild(tr);
   });
 
@@ -512,6 +570,50 @@ function recalc(){
   document.getElementById('rNetto').textContent=fmt(netto);
   document.getElementById('resultCard').style.display='block';
 }
+
+function openDetail(idx){
+  const d=shiftDetails.get(idx);if(!d)return;
+  const skatt=parseFloat(document.getElementById('rSkatt').value)||0;
+  const brutto=d.lon;
+  const skattKr=brutto*skatt/100;
+  const netto=brutto-skattKr;
+  const dateStr=d.start.toLocaleDateString('nn-NO',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const tS=d.start.toLocaleTimeString('nn-NO',{hour:'2-digit',minute:'2-digit'});
+  const tE=d.end.toLocaleTimeString('nn-NO',{hour:'2-digit',minute:'2-digit'});
+  const h1=n=>n.toFixed(1).replace('.',',')+' t';
+  const rate=n=>'kr '+n.toFixed(2).replace('.',',')+'/t';
+  const rows=[];
+  rows.push(`<tr><td>Grunnlønn</td><td>${h1(d.shiftH)}</td><td>${rate(d.rBase)}</td><td>${fmt(d.grunn)}</td></tr>`);
+  if(d.natt>0) rows.push(`<tr><td>Natt (21–06)</td><td>${h1(d.natt)}</td><td>${rate(d.rNatt)}</td><td>${fmt(d.natt*d.rNatt)}</td></tr>`);
+  if(d.helg>0) rows.push(`<tr><td>Helg</td><td>${h1(d.helg)}</td><td>${rate(d.rHelg)}</td><td>${fmt(d.helg*d.rHelg)}</td></tr>`);
+  if(d.heilag>0) rows.push(`<tr><td>Heilagdag</td><td>${h1(d.heilag)}</td><td>${rate(d.rHeilag)}</td><td>${fmt(d.heilag*d.rHeilag)}</td></tr>`);
+  if(d.otDag>0) rows.push(`<tr><td>Overtid 50%</td><td>${h1(d.otDag)}</td><td>+50%</td><td>${fmt(d.otDag*d.rBase*0.5)}</td></tr>`);
+  const ot100H=d.otHeilag+d.otHelg;
+  if(ot100H>0) rows.push(`<tr><td>Overtid 100%</td><td>${h1(ot100H)}</td><td>+100%</td><td>${fmt(d.otHelg*d.rBase+d.otHeilag*d.rHeilag)}</td></tr>`);
+  document.getElementById('detailContent').innerHTML=`
+    <h3>${d.sum}</h3>
+    <p class="mdate">${dateStr}</p>
+    <p class="mtime">${tS} → ${tE}</p>
+    <table class="mtable">
+      <thead><tr><th>Type</th><th>Timar</th><th>Sats</th><th>Sum</th></tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+    <div class="mtotals">
+      <div class="mtotrow brutto"><span class="lbl">Brutto</span><span>${fmt(brutto)}</span></div>
+      <div class="mtotrow skatt"><span class="lbl">Skatt (${skatt}%)</span><span>− ${fmt(skattKr)}</span></div>
+      <div class="mtotrow netto"><span class="lbl">Netto (est.)</span><span>${fmt(netto)}</span></div>
+    </div>`;
+  document.getElementById('detailOverlay').style.display='flex';
+}
+
+function closeDetail(e){
+  if(e&&e.target&&e.target.closest('.modal')&&!e.target.classList.contains('modal-close'))return;
+  document.getElementById('detailOverlay').style.display='none';
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeDetail();
+});
 
 function handleText(text,label){
   const st=document.getElementById('status');
