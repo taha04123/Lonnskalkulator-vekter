@@ -45,7 +45,7 @@ h1 svg{width:24px;height:24px;color:var(--accent);flex-shrink:0}
 .row{display:flex;align-items:center;gap:10px;margin-bottom:.75rem;flex-wrap:wrap}
 .row label{font-size:13px;color:var(--text-2);min-width:150px;flex:1}
 
-input[type=text],input[type=number]{
+input[type=text],input[type=number],input[type=date],input[type=time]{
   height:38px;padding:0 12px;border-radius:8px;
   border:1px solid var(--border);background:var(--card-2);
   color:var(--text);font-size:14px;font-family:inherit;
@@ -53,7 +53,8 @@ input[type=text],input[type=number]{
 }
 input[type=text]{width:100%}
 input[type=number]{width:120px}
-input[type=text]:focus,input[type=number]:focus{border-color:var(--accent);outline:none}
+input[type=date],input[type=time]{width:160px;color-scheme:dark}
+input[type=text]:focus,input[type=number]:focus,input[type=date]:focus,input[type=time]:focus{border-color:var(--accent);outline:none}
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{opacity:0.4}
 
 input[type=file]{font-size:13px;color:var(--text-2);width:100%}
@@ -134,6 +135,16 @@ tr.sum-row:hover{background:transparent !important}
 .badge.ot100::before{content:"⏱⏱ "}
 .badge.ubetferie{background:var(--card);color:#475569}
 .badge.ubetferie::before{content:"🚫 "}
+.badge.manuell{background:var(--card);color:var(--text-2);border:1px solid var(--border)}
+
+.collap-head{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.collap-arrow{color:var(--text-2);font-size:13px;transition:transform 0.2s ease}
+.collapsible.collapsed .collap-body{display:none}
+.collapsible.collapsed .collap-arrow{transform:rotate(-90deg)}
+.collap-body{margin-top:1rem}
+
+.remove-btn{height:26px;width:26px;padding:0;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--text-2);font-size:16px;line-height:1;cursor:pointer;transition:all 0.15s ease;display:inline-flex;align-items:center;justify-content:center}
+.remove-btn:hover{background:#2d0f0f;color:var(--err);border-color:var(--err)}
 
 #resultCard{animation:fadeIn 0.3s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
@@ -226,6 +237,21 @@ tbody tr[data-idx]{cursor:pointer}
   <p class="status" id="status"></p>
 </div>
 
+<div class="card collapsible collapsed" id="manCard">
+  <div class="collap-head" onclick="toggleManual()">
+    <p class="slbl" style="margin:0">Legg til vakt manuelt</p>
+    <span class="collap-arrow">▾</span>
+  </div>
+  <div class="collap-body">
+    <div class="row"><label>Dato</label><input type="date" id="manDate"></div>
+    <div class="row"><label>Start</label><input type="time" id="manStart" value="19:00"></div>
+    <div class="row"><label>Slutt</label><input type="time" id="manEnd" value="07:00"></div>
+    <div class="row"><label>Namn</label><input type="text" id="manName" placeholder="t.d. TIDE - Natt" value="Manuell vakt"></div>
+    <button class="btn-primary" onclick="addManualShift()">Legg til vakt</button>
+    <p class="status err" id="manError"></p>
+  </div>
+</div>
+
 <div class="card">
   <p class="slbl">Satsar</p>
   <div class="row"><label>Grunnlønn (kr/t)</label><input type="number" id="rBase" value="248.99" step="0.01" oninput="recalc()"></div>
@@ -261,7 +287,7 @@ tbody tr[data-idx]{cursor:pointer}
   </div>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Dato</th><th>Namn</th><th>Start</th><th>Slutt</th><th>Timar</th><th class="hide-mobile">Natt t</th><th class="hide-mobile">Helg t</th><th class="hide-mobile">Heilag t</th><th>Type</th><th>Lønn</th></tr></thead>
+    <thead><tr><th>Dato</th><th>Namn</th><th>Start</th><th>Slutt</th><th>Timar</th><th class="hide-mobile">Natt t</th><th class="hide-mobile">Helg t</th><th class="hide-mobile">Heilag t</th><th>Type</th><th>Lønn</th><th></th></tr></thead>
     <tbody id="shiftBody"></tbody>
   </table>
   </div>
@@ -286,6 +312,7 @@ tbody tr[data-idx]{cursor:pointer}
 <script>
 const PROXY='https://ics-proxy.tahaahmed421.workers.dev/';
 let allShifts=[],activeMonth='';
+let shiftIdCounter=0;
 const shiftDetails=new Map();
 
 const UNPAID_KEYWORDS=['UBETFERIE','UBETALT FERIE','UNPAID'];
@@ -480,7 +507,9 @@ function recalc(){
     if(isUnpaid){
       const tr=document.createElement('tr');
       tr.className='unpaid';
-      tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">–</td><td class="hide-mobile">–</td><td class="hide-mobile">–</td><td><span class="badge ubetferie">ubetalt ferie</span></td><td>–</td>`;
+      const nameCell=s.sum+(s.manual?' <span class="badge manuell">manuell</span>':'');
+      const rmCell=s.manual?`<button class="remove-btn" onclick="event.stopPropagation();removeShift(${s.id})" title="Fjern">×</button>`:'';
+      tr.innerHTML=`<td>${dato}</td><td>${nameCell}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">–</td><td class="hide-mobile">–</td><td class="hide-mobile">–</td><td><span class="badge ubetferie">ubetalt ferie</span></td><td>–</td><td>${rmCell}</td>`;
       tbody.appendChild(tr);
       return;
     }
@@ -529,7 +558,9 @@ function recalc(){
     if(heilag>0||otHeilag+otHelg>0) badges.push('<span class="badge ot100">overtid 100%</span>');
 
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">${h1(natt)}</td><td class="hide-mobile">${h1(helg)}</td><td class="hide-mobile">${h1(heilag)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td>`;
+    const nameCell=s.sum+(s.manual?' <span class="badge manuell">manuell</span>':'');
+    const rmCell=s.manual?`<button class="remove-btn" onclick="event.stopPropagation();removeShift(${s.id})" title="Fjern">×</button>`:'';
+    tr.innerHTML=`<td>${dato}</td><td>${nameCell}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">${h1(natt)}</td><td class="hide-mobile">${h1(helg)}</td><td class="hide-mobile">${h1(heilag)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td><td>${rmCell}</td>`;
     tr.dataset.idx=idx;
     tr.onclick=()=>openDetail(idx);
     shiftDetails.set(idx,{
@@ -545,7 +576,7 @@ function recalc(){
   // Sum row
   const sumTr=document.createElement('tr');
   sumTr.className='sum-row';
-  sumTr.innerHTML=`<td colspan="4">Totalt</td><td>${fmtH(totH)}</td><td class="hide-mobile">${h1(totNattH)}</td><td class="hide-mobile">${h1(totHelgH)}</td><td class="hide-mobile">${h1(totHeilagH)}</td><td></td><td>${fmt(totGrunn+totTillegg+totOvertid)}</td>`;
+  sumTr.innerHTML=`<td colspan="4">Totalt</td><td>${fmtH(totH)}</td><td class="hide-mobile">${h1(totNattH)}</td><td class="hide-mobile">${h1(totHelgH)}</td><td class="hide-mobile">${h1(totHeilagH)}</td><td></td><td>${fmt(totGrunn+totTillegg+totOvertid)}</td><td></td>`;
   tbody.appendChild(sumTr);
 
   document.getElementById('rVakter').textContent=filtered.filter(s=>!UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw))).length;
@@ -613,10 +644,41 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape') closeDetail();
 });
 
+function toggleManual(){document.getElementById('manCard').classList.toggle('collapsed');}
+
+function addManualShift(){
+  const date=document.getElementById('manDate').value;
+  const startT=document.getElementById('manStart').value;
+  const endT=document.getElementById('manEnd').value;
+  const name=document.getElementById('manName').value||'Manuell vakt';
+  const err=document.getElementById('manError');
+  if(!date||!startT||!endT){err.textContent='Fyll inn dato, start og slutt.';return;}
+  const[y,m,d]=date.split('-').map(Number);
+  const[sh,sm]=startT.split(':').map(Number);
+  const[eh,em]=endT.split(':').map(Number);
+  const start=new Date(y,m-1,d,sh,sm);
+  const end=new Date(y,m-1,d,eh,em);
+  if(end<=start) end.setDate(end.getDate()+1);
+  allShifts.push({start,end,sum:name,manual:true,id:shiftIdCounter++});
+  allShifts.sort((a,b)=>a.start-b.start);
+  err.textContent='';
+  const st=document.getElementById('status');
+  st.className='status ok';
+  st.textContent=`Vakt lagt til: ${name} (${start.toLocaleDateString('nn-NO')})`;
+  activeMonth=y+'-'+String(m).padStart(2,'0');
+  recalc();
+}
+
+function removeShift(id){
+  allShifts=allShifts.filter(s=>s.id!==id);
+  recalc();
+}
+
 function handleText(text,label){
   const st=document.getElementById('status');
   if(!text||!text.includes('BEGIN:VCALENDAR')){st.className='status err';st.textContent='Ugyldig ICS-data.';return;}
   allShifts=parseICS(text);
+  allShifts.forEach(s=>s.id=shiftIdCounter++);
   if(!allShifts.length){st.className='status err';st.textContent='Ingen vakter funne.';return;}
   st.className='status ok';st.textContent=`Henta ${allShifts.length} oppføringer (${label}).`;
   activeMonth='';recalc();
