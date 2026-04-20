@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="nn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lønnskalkulator — Vekter</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f5;color:#111;padding:1.5rem;max-width:760px;margin:0 auto}
+h1{font-size:20px;font-weight:500;margin-bottom:1.5rem}
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+.slbl{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.85rem}
+.row{display:flex;align-items:center;gap:10px;margin-bottom:.7rem;flex-wrap:wrap}
+.row label{font-size:14px;color:#666;min-width:160px}
+input[type=text],input[type=number]{height:36px;padding:0 10px;border-radius:8px;border:1px solid #ccc;background:#f9f9f9;color:#111;font-size:14px}
+input[type=text]{width:100%}
+input[type=number]{width:110px}
+input[type=file]{font-size:14px;color:#666}
+button{height:36px;padding:0 16px;border-radius:8px;border:1px solid #ccc;background:#fff;color:#111;font-size:14px;cursor:pointer}
+button:hover{background:#f0f0f0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:.75rem}
+.metric{background:#f5f5f5;border-radius:8px;padding:.85rem 1rem}
+.metric .lbl{font-size:12px;color:#666;margin-bottom:4px}
+.metric .val{font-size:18px;font-weight:500}
+.status{font-size:13px;color:#666;margin-top:.5rem;min-height:20px}
+.status.err{color:#c0392b}
+.status.ok{color:#27ae60}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:.75rem}
+th{font-size:11px;color:#666;text-align:left;padding:4px 6px;border-bottom:1px solid #eee;font-weight:400}
+td{padding:5px 6px;border-bottom:1px solid #eee;color:#111;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr.unpaid{opacity:0.45}
+.badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:5px;font-weight:500;white-space:nowrap;margin:1px}
+.badge.dag{background:#f0f0f0;color:#555}
+.badge.natt{background:#e8f0fe;color:#1a56db}
+.badge.helg{background:#fef3c7;color:#92400e}
+.badge.heilag{background:#fce8f3;color:#9b2c74}
+.badge.ot50{background:#e6f4ea;color:#1e6e3a}
+.badge.ot100{background:#fde8e8;color:#9b1c1c}
+.badge.ubetferie{background:#eee;color:#999}
+.month-sel{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem}
+.month-btn{height:30px;padding:0 12px;font-size:12px}
+.month-btn.active{background:#111;color:#fff;border-color:#111}
+.info{font-size:12px;color:#888;margin-top:.75rem}
+.tabs{display:flex;gap:8px;margin-bottom:1rem}
+.tab{height:34px;padding:0 14px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:13px;cursor:pointer;color:#666}
+.tab.active{background:#111;color:#fff;border-color:#111}
+.sum-row td{font-weight:500;border-top:1px solid #ccc;border-bottom:none}
+</style>
+</head>
+<body>
+<h1>Lønnskalkulator — Vekter</h1>
+
+<div class="card">
+  <p class="slbl">Hent vakter</p>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('ics')">ICS-lenkje</button>
+    <button class="tab" onclick="switchTab('file')">Last opp fil</button>
+  </div>
+  <div id="tabIcs">
+    <div class="row"><input type="text" id="icsUrl" placeholder="https://…/ical/….ics"></div>
+    <button onclick="loadICS()">Hent vakter</button>
+    <p class="info">Lim inn iCal-lenkje frå Optima eller Google Calendar.</p>
+  </div>
+  <div id="tabFile" style="display:none">
+    <div class="row"><input type="file" id="icsFile" accept=".ics" onchange="loadFile()"></div>
+    <p class="info">Eksporter .ics og last opp her.</p>
+  </div>
+  <p class="status" id="status"></p>
+</div>
+
+<div class="card">
+  <p class="slbl">Satsar</p>
+  <div class="row"><label>Grunnlønn (kr/t)</label><input type="number" id="rBase" value="248.99" step="0.01" oninput="recalc()"></div>
+  <div class="row"><label>Nattillegg kr/t (21–06)</label><input type="number" id="rNatt" value="28" step="0.5" oninput="recalc()"></div>
+  <div class="row"><label>Helgetillegg kr/t (lør 18–man 06)</label><input type="number" id="rHelg" value="48" step="0.5" oninput="recalc()"></div>
+  <div class="row"><label>Overtidsgrense (t/veke)</label><input type="number" id="rOtGrense" value="41" step="0.5" oninput="recalc()"></div>
+</div>
+
+<div class="card" id="resultCard" style="display:none">
+  <p class="slbl">Resultat</p>
+  <div class="month-sel" id="monthSel"></div>
+  <div class="grid">
+    <div class="metric"><p class="lbl">Vakter</p><p class="val" id="rVakter">–</p></div>
+    <div class="metric"><p class="lbl">Timar totalt</p><p class="val" id="rTimer">–</p></div>
+    <div class="metric"><p class="lbl">Grunnlønn</p><p class="val" id="rGrunn">–</p></div>
+    <div class="metric"><p class="lbl">Tillegg</p><p class="val" id="rTillegg">–</p></div>
+    <div class="metric"><p class="lbl">Overtid</p><p class="val" id="rOvertid">–</p></div>
+    <div class="metric" style="border:1px solid #ccc"><p class="lbl">Totalt</p><p class="val" id="rTotal">–</p></div>
+  </div>
+  <div style="overflow-x:auto">
+  <table>
+    <thead><tr><th>Dato</th><th>Namn</th><th>Start</th><th>Slutt</th><th>Timar</th><th>Type</th><th>Lønn</th></tr></thead>
+    <tbody id="shiftBody"></tbody>
+  </table>
+  </div>
+  <p class="info">* Brutto før skatt. Heilagdagstillegg = 100% av begynnerlønn (kr 248,99/t). Overtid over 41t/veke: +50% kvardag, +100% helg/heilagdag.</p>
+</div>
+
+<script>
+const PROXY='https://ics-proxy.tahaahmed421.workers.dev/';
+let allShifts=[],activeMonth='';
+
+const UNPAID_KEYWORDS=['UBETFERIE','UBETALT FERIE','UNPAID'];
+
+function fmt(n){return'kr '+Math.round(n).toLocaleString('nb-NO')}
+function fmtH(n){return n.toFixed(1).replace('.',',')+' t'}
+
+// Norwegian public holidays with exact tariff windows from §5.5c
+function getHolidayWindows(year){
+  const e=easterSunday(year);
+  const w=[];
+  // Påske: frå kl.18 dagen før skjærtorsdag → kl.06 3. påskedag
+  const maundyThursday=addDays(e,-3);
+  w.push({from:dateAt(addDays(maundyThursday,-1),18,0),to:dateAt(addDays(e,2),6,0),name:'Påske'});
+  // 1. mai: frå kl.21 dagen før → kl.06 dagen etter
+  w.push({from:dateAt(new Date(year,4,0),21,0),to:dateAt(new Date(year,4,2),6,0),name:'1. mai'});
+  // 17. mai
+  w.push({from:dateAt(new Date(year,4,16),21,0),to:dateAt(new Date(year,4,18),6,0),name:'17. mai'});
+  // Kristi himmelfartsdag (39 dagar etter påske): frå kl.18 dagen før → kl.06 dagen etter
+  const ascension=addDays(e,39);
+  w.push({from:dateAt(addDays(ascension,-1),18,0),to:dateAt(addDays(ascension,1),6,0),name:'Kristi himmelfartsdag'});
+  // Pinse (49 dagar etter påske): frå kl.15 pinseaften (dag før) → kl.06 3. pinsedag
+  const whitsun=addDays(e,49);
+  w.push({from:dateAt(addDays(whitsun,-1),15,0),to:dateAt(addDays(whitsun,2),6,0),name:'Pinse'});
+  // Jul: frå kl.15 julaften → kl.06 3. juledag
+  w.push({from:dateAt(new Date(year,11,24),15,0),to:dateAt(new Date(year,11,27),6,0),name:'Jul'});
+  // Nyttår: frå kl.15 nyttårsaften → kl.06 2. nyttårsdag
+  w.push({from:dateAt(new Date(year,11,31),15,0),to:dateAt(new Date(year+1,0,2),6,0),name:'Nyttår'});
+  return w;
+}
+
+function easterSunday(y){
+  const a=y%19,b=Math.floor(y/100),c=y%100;
+  const d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31)-1;
+  const day=(h+l-7*m+114)%31+1;
+  return new Date(y,month,day);
+}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function dateAt(d,h,m){return new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,m);}
+
+function isInHolidayWindow(dt,windows){
+  for(const w of windows) if(dt>=w.from&&dt<w.to) return w.name;
+  return null;
+}
+
+function isWeekend(dt){
+  // Helg: lørdag kl.18 → mandag kl.06
+  const d=dt.getDay(),h=dt.getHours(),m=dt.getMinutes();
+  if(d===6&&(h>18||(h===18&&m===0))) return true;
+  if(d===0) return true;
+  if(d===1&&(h<6||(h===6&&m===0))) return true;
+  return false;
+}
+
+function isNight(dt){
+  const h=dt.getHours();
+  return h>=21||h<6;
+}
+
+// Classify each minute of a shift, return breakdown
+function classifyMinutes(start,end,holidayWindows){
+  let heilag=0,helg=0,natt=0,dag=0;
+  let cur=new Date(start);
+  while(cur<end){
+    if(isInHolidayWindow(cur,holidayWindows)) heilag+=1;
+    else if(isWeekend(cur)) helg+=1;
+    else if(isNight(cur)) natt+=1;
+    else dag+=1;
+    cur=new Date(cur.getTime()+60000);
+  }
+  return{heilag:heilag/60,helg:helg/60,natt:natt/60,dag:dag/60};
+}
+
+function getWeekKey(d){
+  const tmp=new Date(d);
+  tmp.setHours(0,0,0,0);
+  const day=tmp.getDay()||7;
+  tmp.setDate(tmp.getDate()+1-day);
+  return tmp.toISOString().slice(0,10);
+}
+
+function switchTab(t){
+  document.getElementById('tabIcs').style.display=t==='ics'?'':'none';
+  document.getElementById('tabFile').style.display=t==='file'?'':'none';
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(t==='ics'&&i===0)||(t==='file'&&i===1)));
+}
+
+function parseICS(text){
+  const events=[];
+  const blocks=text.split('BEGIN:VEVENT');
+  for(let i=1;i<blocks.length;i++){
+    const b=blocks[i];
+    const get=k=>{const m=b.match(new RegExp(k+'[^:]*:([^\r\n]+)'));return m?m[1].trim():''};
+    const dtStr=s=>{
+      if(!s)return null;
+      s=s.replace(/Z$/,'');
+      const bare=s.replace('T','');
+      if(bare.length<8)return null;
+      return new Date(+bare.slice(0,4),+bare.slice(4,6)-1,+bare.slice(6,8),bare.length>=10?+bare.slice(8,10):0,bare.length>=12?+bare.slice(10,12):0);
+    };
+    const start=dtStr(get('DTSTART'));
+    const end=dtStr(get('DTEND'));
+    const sum=get('SUMMARY')||'Vakt';
+    if(start&&end&&end>start) events.push({start,end,sum});
+  }
+  return events;
+}
+
+function getMonths(shifts){
+  return[...new Set(shifts.map(s=>s.start.getFullYear()+'-'+String(s.start.getMonth()+1).padStart(2,'0')))].sort();
+}
+function monthLabel(k){
+  const[y,m]=k.split('-');
+  return new Date(+y,+m-1,1).toLocaleDateString('nn-NO',{month:'long',year:'numeric'});
+}
+
+function recalc(){
+  if(!allShifts.length)return;
+  const rBase=parseFloat(document.getElementById('rBase').value)||248.99;
+  const rNatt=parseFloat(document.getElementById('rNatt').value)||28;
+  const rHelg=parseFloat(document.getElementById('rHelg').value)||48;
+  const otGrense=parseFloat(document.getElementById('rOtGrense').value)||41;
+
+  const months=getMonths(allShifts);
+  if(!activeMonth||!months.includes(activeMonth))activeMonth=months[months.length-1];
+
+  const sel=document.getElementById('monthSel');
+  sel.innerHTML='';
+  months.forEach(k=>{
+    const btn=document.createElement('button');
+    btn.className='month-btn'+(k===activeMonth?' active':'');
+    btn.textContent=monthLabel(k);
+    btn.onclick=()=>{activeMonth=k;recalc();};
+    sel.appendChild(btn);
+  });
+
+  // Group all shifts by week for overtime calculation
+  const weekHours={};
+  allShifts.forEach(s=>{
+    const isUnpaid=UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw));
+    if(isUnpaid)return;
+    const wk=getWeekKey(s.start);
+    const h=(s.end-s.start)/3600000;
+    weekHours[wk]=(weekHours[wk]||0)+h;
+  });
+
+  // Per-shift overtime allocation (track used hours per week)
+  const weekUsed={};
+
+  const filtered=allShifts.filter(s=>{
+    const k=s.start.getFullYear()+'-'+String(s.start.getMonth()+1).padStart(2,'0');
+    return k===activeMonth;
+  });
+
+  let totH=0,totGrunn=0,totTillegg=0,totOvertid=0;
+  const tbody=document.getElementById('shiftBody');
+  tbody.innerHTML='';
+
+  filtered.forEach(s=>{
+    const isUnpaid=UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw));
+    const shiftH=(s.end-s.start)/3600000;
+    const dato=s.start.toLocaleDateString('nn-NO',{weekday:'short',day:'numeric',month:'short'});
+    const tS=s.start.toLocaleTimeString('nn-NO',{hour:'2-digit',minute:'2-digit'});
+    const tE=s.end.toLocaleTimeString('nn-NO',{hour:'2-digit',minute:'2-digit'});
+
+    if(isUnpaid){
+      const tr=document.createElement('tr');
+      tr.className='unpaid';
+      tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td><span class="badge ubetferie">ubetalt ferie</span></td><td>–</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    const yr=s.start.getFullYear();
+    const hw=getHolidayWindows(yr);
+    const{heilag,helg,natt,dag}=classifyMinutes(s.start,s.end,hw);
+
+    // Overtime for this shift
+    const wk=getWeekKey(s.start);
+    const totalWkH=weekHours[wk]||0;
+    const used=weekUsed[wk]||0;
+    const otH=Math.max(0,Math.min(shiftH,totalWkH-otGrense)-used);
+    weekUsed[wk]=(used+otH);
+
+    // Base pay
+    const grunn=shiftH*rBase;
+
+    // Ubekvem tillegg
+    const tillegg=natt*rNatt+helg*rHelg+heilag*rBase; // heilagdag = 100% av rBase
+
+    // Overtime pay (simplified: apply OT rate to last OT hours of shift)
+    // Determine if OT hours are on heilag/helg or regular
+    const heilagFraction=heilag/shiftH;
+    const helgFraction=helg/shiftH;
+    const otHeilag=otH*heilagFraction;
+    const otHelg=otH*helgFraction;
+    const otDag=otH-otHeilag-otHelg;
+    const otPay=otDag*rBase*0.5+(otHeilag+otHelg)*rBase*1.0;
+
+    const lon=grunn+tillegg+otPay;
+    totH+=shiftH; totGrunn+=grunn; totTillegg+=tillegg; totOvertid+=otPay;
+
+    // Badges
+    const badges=[];
+    if(dag>0) badges.push('<span class="badge dag">dag</span>');
+    if(natt>0) badges.push('<span class="badge natt">natt</span>');
+    if(helg>0) badges.push('<span class="badge helg">helg</span>');
+    if(heilag>0) badges.push('<span class="badge heilag">heilagdag</span>');
+    if(otDag>0) badges.push('<span class="badge ot50">overtid 50%</span>');
+    if(otHeilag+otHelg>0) badges.push('<span class="badge ot100">overtid 100%</span>');
+
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Sum row
+  const sumTr=document.createElement('tr');
+  sumTr.className='sum-row';
+  sumTr.innerHTML=`<td colspan="4">Totalt</td><td>${fmtH(totH)}</td><td></td><td>${fmt(totGrunn+totTillegg+totOvertid)}</td>`;
+  tbody.appendChild(sumTr);
+
+  document.getElementById('rVakter').textContent=filtered.filter(s=>!UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw))).length;
+  document.getElementById('rTimer').textContent=fmtH(totH);
+  document.getElementById('rGrunn').textContent=fmt(totGrunn);
+  document.getElementById('rTillegg').textContent=fmt(totTillegg);
+  document.getElementById('rOvertid').textContent=fmt(totOvertid);
+  document.getElementById('rTotal').textContent=fmt(totGrunn+totTillegg+totOvertid);
+  document.getElementById('resultCard').style.display='block';
+}
+
+function handleText(text,label){
+  const st=document.getElementById('status');
+  if(!text||!text.includes('BEGIN:VCALENDAR')){st.className='status err';st.textContent='Ugyldig ICS-data.';return;}
+  allShifts=parseICS(text);
+  if(!allShifts.length){st.className='status err';st.textContent='Ingen vakter funne.';return;}
+  st.className='status ok';st.textContent=`Henta ${allShifts.length} oppføringer (${label}).`;
+  activeMonth='';recalc();
+}
+
+async function loadICS(){
+  const url=document.getElementById('icsUrl').value.trim();
+  const st=document.getElementById('status');
+  if(!url){st.className='status err';st.textContent='Lim inn ei ICS-lenkje fyrst.';return;}
+  st.className='status';st.textContent='Hentar…';
+  try{
+    const r=await fetch(PROXY+'?url='+encodeURIComponent(url));
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    handleText(await r.text(),'ICS-lenkje');
+  }catch(e){
+    st.className='status err';st.textContent='Klarte ikkje hente. Prøv filopplasting i staden.';
+  }
+}
+
+function loadFile(){
+  const file=document.getElementById('icsFile').files[0];
+  const st=document.getElementById('status');
+  if(!file)return;
+  st.className='status';st.textContent='Les fil…';
+  const reader=new FileReader();
+  reader.onload=e=>handleText(e.target.result,file.name);
+  reader.onerror=()=>{st.className='status err';st.textContent='Klarte ikkje lese fila.';};
+  reader.readAsText(file,'UTF-8');
+}
+</script>
+</body>
+</html>
