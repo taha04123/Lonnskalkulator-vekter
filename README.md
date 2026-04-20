@@ -122,4 +122,27 @@ Aktivert under **Settings → Pages → Branch: main / root**.
 
 1. Opne kalkulatoren i nettlesaren
 2. Lim inn iCal-lenkja frå Optima (eller last opp `.ics`-fil)
-3. Juster satsar ved behov (grunnl
+3. Juster satsar ved behov (grunnlønn, tillegg, skatteprosent)
+4. Vel månad for å sjå vaktliste og lønnsoversikt
+
+### Hente iCal-lenkje frå Optima
+
+1. Logg inn på Optima-portalen
+2. Finn kalenderintegrasjon / iCal-eksport
+3. Kopier lenkja og lim inn i kalkulatoren
+
+---
+
+## Avgrensingar
+
+- Skatteutrekning er ein **enkel estimat** basert på flat prosentsats — ikkje trekktabell
+- Overtid blir rekna per veke (man–søn), ikkje per dag
+- Heilagdagsutrekning er automatisk for kvart år (påskedato rekna ut algoritmisk)
+- Kalkulatoren er laga for **35,5 t/veke turnus** som standard — juster grunnlønn for andre ordningar
+
+---
+
+## Kjelder
+
+- [Vekteroverenskomsten 2024–2026 (NAF)](https://arbeidsmandsforbundet.no/wp-content/uploads/2025/01/Vektere-overenskomsten-2024-2026.pdf)
+- [Tariffbrev 2025 — NHO Service og Handel](https://www.nhosh.no/contentassets/1b41a3810bb94fedafdc4f1bbd2251c9/tariffbrev-2025-vekter.pdf)
