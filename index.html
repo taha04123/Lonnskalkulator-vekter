@@ -90,6 +90,12 @@ button:hover{background:#1e2235;color:var(--text)}
 .metric-netto .val{color:var(--ok)}
 .metric-overtid{border-left:3px solid var(--warn)}
 
+.breakdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:.5rem}
+.bcard{background:var(--card-2);border-radius:10px;padding:.9rem 1rem;transition:all 0.15s ease}
+.blbl{font-size:11px;color:var(--text-2);margin-bottom:8px;font-weight:500}
+.bval{font-size:15px;font-weight:600;color:var(--text);font-family:'JetBrains Mono',monospace;display:flex;gap:10px;align-items:center;letter-spacing:-0.01em}
+.bsep{color:var(--text-2);font-weight:400}
+
 .status{font-size:13px;color:var(--text-2);margin-top:.5rem;min-height:20px}
 .status.err{color:var(--err)}
 .status.ok{color:var(--ok)}
@@ -149,8 +155,11 @@ tr.sum-row:hover{background:transparent !important}
   .row{margin-bottom:.9rem;gap:6px}
   input[type=number]{width:100%}
   .grid{grid-template-columns:repeat(2,1fr)}
-  table{min-width:600px}
+  .breakdown{grid-template-columns:repeat(2,1fr)}
+  .bval{font-size:13px;gap:6px}
+  table{min-width:480px}
   .month-btn{height:36px;padding:0 14px}
+  .hide-mobile{display:none !important}
 }
 </style>
 </head>
@@ -196,6 +205,7 @@ tr.sum-row:hover{background:transparent !important}
   <div class="row"><label>Grunnlønn (kr/t)</label><input type="number" id="rBase" value="248.99" step="0.01" oninput="recalc()"></div>
   <div class="row"><label>Nattillegg kr/t (21–06)</label><input type="number" id="rNatt" value="28" step="0.5" oninput="recalc()"></div>
   <div class="row"><label>Helgetillegg kr/t (lør 18–man 06)</label><input type="number" id="rHelg" value="48" step="0.5" oninput="recalc()"></div>
+  <div class="row"><label>Heilagdagssats kr/t (§5.5c)</label><input type="number" id="rHeilag" value="235.71" step="0.01" oninput="recalc()"></div>
   <div class="row"><label>Overtidsgrense (t/veke)</label><input type="number" id="rOtGrense" value="41" step="0.5" oninput="recalc()"></div>
   <div class="row"><label>Skatteprosent (%)</label><input type="number" id="rSkatt" value="16" step="0.5" min="0" max="60" oninput="recalc()"></div>
 </div>
@@ -216,9 +226,16 @@ tr.sum-row:hover{background:transparent !important}
     <div class="metric metric-brutto"><p class="lbl">Brutto</p><p class="val" id="rTotal">–</p></div>
     <div class="metric metric-netto"><p class="lbl">Netto (est.)</p><p class="val" id="rNetto">–</p></div>
   </div>
+  <p class="slbl" style="margin-top:1.5rem">Fordeling</p>
+  <div class="breakdown">
+    <div class="bcard"><p class="blbl">🌙 Natttimar</p><p class="bval"><span id="bNattH">–</span><span class="bsep">|</span><span id="bNattKr">–</span></p></div>
+    <div class="bcard"><p class="blbl">🏖 Helgetimar</p><p class="bval"><span id="bHelgH">–</span><span class="bsep">|</span><span id="bHelgKr">–</span></p></div>
+    <div class="bcard"><p class="blbl">⛪ Heilagdagstimar</p><p class="bval"><span id="bHeilagH">–</span><span class="bsep">|</span><span id="bHeilagKr">–</span></p></div>
+    <div class="bcard"><p class="blbl">⏱ Overtidstimar</p><p class="bval"><span id="bOtH">–</span><span class="bsep">|</span><span id="bOtKr">–</span></p></div>
+  </div>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Dato</th><th>Namn</th><th>Start</th><th>Slutt</th><th>Timar</th><th>Type</th><th>Lønn</th></tr></thead>
+    <thead><tr><th>Dato</th><th>Namn</th><th>Start</th><th>Slutt</th><th>Timar</th><th class="hide-mobile">Natt t</th><th class="hide-mobile">Helg t</th><th class="hide-mobile">Heilag t</th><th>Type</th><th>Lønn</th></tr></thead>
     <tbody id="shiftBody"></tbody>
   </table>
   </div>
@@ -238,7 +255,6 @@ const PROXY='https://ics-proxy.tahaahmed421.workers.dev/';
 let allShifts=[],activeMonth='';
 
 const UNPAID_KEYWORDS=['UBETFERIE','UBETALT FERIE','UNPAID'];
-const HEILAG_BASE=38302.14/162.5; // ~235.71 kr/t per §5.5d
 
 function fmt(n){return'kr '+Math.round(n).toLocaleString('nb-NO')}
 function fmtH(n){return n.toFixed(1).replace('.',',')+' t'}
@@ -364,6 +380,7 @@ function recalc(){
   const rBase=parseFloat(document.getElementById('rBase').value)||248.99;
   const rNatt=parseFloat(document.getElementById('rNatt').value)||28;
   const rHelg=parseFloat(document.getElementById('rHelg').value)||48;
+  const rHeilag=parseFloat(document.getElementById('rHeilag').value)||235.71;
   const otGrense=parseFloat(document.getElementById('rOtGrense').value)||41;
 
   const months=getMonths(allShifts);
@@ -398,8 +415,13 @@ function recalc(){
   });
 
   let totH=0,totGrunn=0,totTillegg=0,totOvertid=0;
+  let totNattH=0,totNattKr=0;
+  let totHelgH=0,totHelgKr=0;
+  let totHeilagH=0,totHeilagKr=0;
+  let totOtH=0,totOtKr=0;
   const tbody=document.getElementById('shiftBody');
   tbody.innerHTML='';
+  const h1=n=>n.toFixed(1).replace('.',',');
 
   filtered.forEach(s=>{
     const isUnpaid=UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw));
@@ -411,7 +433,7 @@ function recalc(){
     if(isUnpaid){
       const tr=document.createElement('tr');
       tr.className='unpaid';
-      tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td><span class="badge ubetferie">ubetalt ferie</span></td><td>–</td>`;
+      tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">–</td><td class="hide-mobile">–</td><td class="hide-mobile">–</td><td><span class="badge ubetferie">ubetalt ferie</span></td><td>–</td>`;
       tbody.appendChild(tr);
       return;
     }
@@ -433,8 +455,8 @@ function recalc(){
     // Ubekvem tillegg (natt og helg kun)
     const tillegg=natt*rNatt+helg*rHelg;
 
-    // Heilagdag 100% tillegg brukar HEILAG_BASE (§5.5d, fast divisor 162.5)
-    const heilagOt=heilag*HEILAG_BASE*1.0;
+    // Heilagdag 100% tillegg brukar rHeilag (§5.5d, fast divisor 162.5)
+    const heilagOt=heilag*rHeilag*1.0;
 
     // Vekeovertid: timar over grensa
     const heilagFraction=heilag/shiftH;
@@ -442,10 +464,14 @@ function recalc(){
     const otHeilag=otH*heilagFraction;
     const otHelg=otH*helgFraction;
     const otDag=otH-otHeilag-otHelg;
-    const otPay=otDag*rBase*0.5+otHelg*rBase*1.0+otHeilag*HEILAG_BASE*1.0;
+    const otPay=otDag*rBase*0.5+otHelg*rBase*1.0+otHeilag*rHeilag*1.0;
 
     const lon=grunn+tillegg+heilagOt+otPay;
     totH+=shiftH; totGrunn+=grunn; totTillegg+=tillegg; totOvertid+=heilagOt+otPay;
+    totNattH+=natt; totNattKr+=natt*rNatt;
+    totHelgH+=helg; totHelgKr+=helg*rHelg;
+    totHeilagH+=heilag; totHeilagKr+=heilag*rHeilag;
+    totOtH+=otH; totOtKr+=otPay;
 
     // Badges
     const badges=[];
@@ -456,14 +482,14 @@ function recalc(){
     if(heilag>0||otHeilag+otHelg>0) badges.push('<span class="badge ot100">overtid 100%</span>');
 
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td>`;
+    tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">${h1(natt)}</td><td class="hide-mobile">${h1(helg)}</td><td class="hide-mobile">${h1(heilag)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td>`;
     tbody.appendChild(tr);
   });
 
   // Sum row
   const sumTr=document.createElement('tr');
   sumTr.className='sum-row';
-  sumTr.innerHTML=`<td colspan="4">Totalt</td><td>${fmtH(totH)}</td><td></td><td>${fmt(totGrunn+totTillegg+totOvertid)}</td>`;
+  sumTr.innerHTML=`<td colspan="4">Totalt</td><td>${fmtH(totH)}</td><td class="hide-mobile">${h1(totNattH)}</td><td class="hide-mobile">${h1(totHelgH)}</td><td class="hide-mobile">${h1(totHeilagH)}</td><td></td><td>${fmt(totGrunn+totTillegg+totOvertid)}</td>`;
   tbody.appendChild(sumTr);
 
   document.getElementById('rVakter').textContent=filtered.filter(s=>!UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw))).length;
@@ -471,6 +497,14 @@ function recalc(){
   document.getElementById('rGrunn').textContent=fmt(totGrunn);
   document.getElementById('rTillegg').textContent=fmt(totTillegg);
   document.getElementById('rOvertid').textContent=fmt(totOvertid);
+  document.getElementById('bNattH').textContent=fmtH(totNattH);
+  document.getElementById('bNattKr').textContent=fmt(totNattKr);
+  document.getElementById('bHelgH').textContent=fmtH(totHelgH);
+  document.getElementById('bHelgKr').textContent=fmt(totHelgKr);
+  document.getElementById('bHeilagH').textContent=fmtH(totHeilagH);
+  document.getElementById('bHeilagKr').textContent=fmt(totHeilagKr);
+  document.getElementById('bOtH').textContent=fmtH(totOtH);
+  document.getElementById('bOtKr').textContent=fmt(totOtKr);
   const brutto=totGrunn+totTillegg+totOvertid;
   const skatt=parseFloat(document.getElementById('rSkatt').value)||0;
   const netto=brutto*(1-skatt/100);
