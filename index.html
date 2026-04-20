@@ -143,6 +143,10 @@ tr.sum-row:hover{background:transparent !important}
 .collapsible.collapsed .collap-arrow{transform:rotate(-90deg)}
 .collap-body{margin-top:1rem}
 
+input[type=checkbox]{accent-color:var(--accent);width:18px;height:18px;cursor:pointer;margin:0}
+.row-check{display:flex;align-items:center;gap:10px;margin-bottom:.75rem}
+.row-check label{font-size:13px;color:var(--text-2);cursor:pointer;user-select:none}
+
 .remove-btn{height:26px;width:26px;padding:0;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--text-2);font-size:16px;line-height:1;cursor:pointer;transition:all 0.15s ease;display:inline-flex;align-items:center;justify-content:center}
 .remove-btn:hover{background:#2d0f0f;color:var(--err);border-color:var(--err)}
 
@@ -245,6 +249,7 @@ tbody tr[data-idx]{cursor:pointer}
     <div class="row"><label>Dato</label><input type="date" id="manDate"></div>
     <div class="row"><label>Start</label><input type="time" id="manStart" value="19:00"></div>
     <div class="row"><label>Slutt</label><input type="time" id="manEnd" value="07:00"></div>
+    <div class="row-check"><input type="checkbox" id="manOvertid"><label for="manOvertid">Overtid (heile vakta)</label></div>
     <div class="row"><label>Namn</label><input type="text" id="manName" placeholder="t.d. TIDE - Natt" value="Manuell vakt"></div>
     <button class="btn-primary" onclick="addManualShift()">Legg til vakt</button>
     <p class="status err" id="manError"></p>
@@ -473,6 +478,7 @@ function recalc(){
   allShifts.forEach(s=>{
     const isUnpaid=UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw));
     if(isUnpaid)return;
+    if(s.forceOvertid)return;
     const wk=getWeekKey(s.start);
     const h=(s.end-s.start)/3600000;
     weekHours[wk]=(weekHours[wk]||0)+h;
@@ -517,13 +523,6 @@ function recalc(){
     const hw=getHolidayWindows(yr);
     const{heilag,helg,natt,dag}=classifyMinutes(s.start,s.end,hw);
 
-    // Overtime for this shift
-    const wk=getWeekKey(s.start);
-    const totalWkH=weekHours[wk]||0;
-    const used=weekUsed[wk]||0;
-    const otH=Math.max(0,Math.min(shiftH,totalWkH-otGrense)-used);
-    weekUsed[wk]=(used+otH);
-
     // Base pay
     const grunn=shiftH*rBase;
 
@@ -533,13 +532,25 @@ function recalc(){
     // Heilagdag 100% tillegg brukar rHeilag (§5.5d, fast divisor 162.5)
     const heilagOt=heilag*rHeilag*1.0;
 
-    // Vekeovertid: timar over grensa. heilag og helg er eksklusive, so summen er ≤1.
-    const heilagFraction=heilag/shiftH;
-    const helgFraction=helg/shiftH;
-    const otHeilag=otH*heilagFraction;
-    const otHelg=otH*helgFraction;
-    const otDag=otH-otHeilag-otHelg;
-    const otPay=otDag*rBase*0.5+otHelg*rBase*1.0+otHeilag*rHeilag*1.0;
+    let otH,otDag,otHelg,otHeilag,otPay;
+    if(s.forceOvertid){
+      // Manuell overtid — heile vakta som 50% kvardagsovertid
+      otH=shiftH;otDag=shiftH;otHelg=0;otHeilag=0;
+      otPay=shiftH*rBase*0.5;
+    }else{
+      // Vekeovertid: timar over grensa. heilag og helg er eksklusive, so summen er ≤1.
+      const wk=getWeekKey(s.start);
+      const totalWkH=weekHours[wk]||0;
+      const used=weekUsed[wk]||0;
+      otH=Math.max(0,Math.min(shiftH,totalWkH-otGrense)-used);
+      weekUsed[wk]=(used+otH);
+      const heilagFraction=heilag/shiftH;
+      const helgFraction=helg/shiftH;
+      otHeilag=otH*heilagFraction;
+      otHelg=otH*helgFraction;
+      otDag=otH-otHeilag-otHelg;
+      otPay=otDag*rBase*0.5+otHelg*rBase*1.0+otHeilag*rHeilag*1.0;
+    }
 
     const lon=grunn+tillegg+heilagOt+otPay;
     totH+=shiftH; totGrunn+=grunn; totTillegg+=tillegg; totOvertid+=heilagOt+otPay;
@@ -650,6 +661,7 @@ function addManualShift(){
   const startT=document.getElementById('manStart').value;
   const endT=document.getElementById('manEnd').value;
   const name=document.getElementById('manName').value||'Manuell vakt';
+  const isOvertid=document.getElementById('manOvertid').checked;
   const err=document.getElementById('manError');
   if(!date||!startT||!endT){err.textContent='Fyll inn dato, start og slutt.';return;}
   const[y,m,d]=date.split('-').map(Number);
@@ -658,7 +670,7 @@ function addManualShift(){
   const start=new Date(y,m-1,d,sh,sm);
   const end=new Date(y,m-1,d,eh,em);
   if(end<=start) end.setDate(end.getDate()+1);
-  allShifts.push({start,end,sum:name,manual:true,id:shiftIdCounter++});
+  allShifts.push({start,end,sum:name,manual:true,forceOvertid:isOvertid,id:shiftIdCounter++});
   allShifts.sort((a,b)=>a.start-b.start);
   err.textContent='';
   const st=document.getElementById('status');
