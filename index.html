@@ -270,8 +270,8 @@ function recalc(){
     const isUnpaid=UNPAID_KEYWORDS.some(kw=>s.sum.toUpperCase().includes(kw));
     const shiftH=(s.end-s.start)/3600000;
     const dato=s.start.toLocaleDateString('nn-NO',{weekday:'short',day:'numeric',month:'short'});
-    const tS=s.start.toLocaleTimeString('nn-NO',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Oslo'});
-    const tE=s.end.toLocaleTimeString('nn-NO',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Oslo'});
+    const tS=s.start.toLocaleTimeString('nn-NO',{hour:'2-digit',minute:'2-digit'});
+    const tE=s.end.toLocaleTimeString('nn-NO',{hour:'2-digit',minute:'2-digit'});
 
     if(isUnpaid){
       const tr=document.createElement('tr');
