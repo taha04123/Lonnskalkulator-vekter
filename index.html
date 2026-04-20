@@ -4,52 +4,174 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lønnskalkulator — Vekter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
+:root{
+  --bg:#0f1117;
+  --card:#1a1d27;
+  --card-2:#13161f;
+  --border:#2d3348;
+  --accent:#3b82f6;
+  --accent-hover:#2563eb;
+  --text:#f1f5f9;
+  --text-2:#64748b;
+  --ok:#22c55e;
+  --err:#ef4444;
+  --warn:#f59e0b;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#f5f5f5;color:#111;padding:1.5rem;max-width:760px;margin:0 auto}
-h1{font-size:20px;font-weight:500;margin-bottom:1.5rem}
-.card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
-.slbl{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.85rem}
-.row{display:flex;align-items:center;gap:10px;margin-bottom:.7rem;flex-wrap:wrap}
-.row label{font-size:14px;color:#666;min-width:160px}
-input[type=text],input[type=number]{height:36px;padding:0 10px;border-radius:8px;border:1px solid #ccc;background:#f9f9f9;color:#111;font-size:14px}
+html,body{background:var(--bg)}
+body{font-family:'Inter',system-ui,sans-serif;color:var(--text);font-size:14px;min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+.topbar{background:var(--card);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 1.5rem;gap:12px}
+.topbar svg{width:22px;height:22px;color:var(--accent);flex-shrink:0}
+.topbar .title{font-size:15px;font-weight:600;color:var(--text);letter-spacing:-0.01em}
+.topbar .subtitle{font-size:12px;color:var(--text-2);margin-left:8px;border-left:1px solid var(--border);padding-left:12px}
+
+.container{max-width:1100px;margin:0 auto;padding:2rem}
+h1{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:600;margin-bottom:1.5rem;color:var(--text);letter-spacing:-0.01em}
+h1 svg{width:24px;height:24px;color:var(--accent);flex-shrink:0}
+
+.layout{display:grid;grid-template-columns:340px 1fr;gap:1.25rem;align-items:start}
+.col-left{position:sticky;top:1.5rem;display:flex;flex-direction:column;gap:1rem}
+.col-right{min-width:0}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.5rem}
+
+.slbl{font-size:10px;color:var(--text-2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;font-weight:500}
+
+.row{display:flex;align-items:center;gap:10px;margin-bottom:.75rem;flex-wrap:wrap}
+.row label{font-size:13px;color:var(--text-2);min-width:150px;flex:1}
+
+input[type=text],input[type=number]{
+  height:38px;padding:0 12px;border-radius:8px;
+  border:1px solid var(--border);background:var(--card-2);
+  color:var(--text);font-size:14px;font-family:inherit;
+  transition:all 0.15s ease;
+}
 input[type=text]{width:100%}
-input[type=number]{width:110px}
-input[type=file]{font-size:14px;color:#666}
-button{height:36px;padding:0 16px;border-radius:8px;border:1px solid #ccc;background:#fff;color:#111;font-size:14px;cursor:pointer}
-button:hover{background:#f0f0f0}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:.75rem}
-.metric{background:#f5f5f5;border-radius:8px;padding:.85rem 1rem}
-.metric .lbl{font-size:12px;color:#666;margin-bottom:4px}
-.metric .val{font-size:18px;font-weight:500}
-.status{font-size:13px;color:#666;margin-top:.5rem;min-height:20px}
-.status.err{color:#c0392b}
-.status.ok{color:#27ae60}
-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:.75rem}
-th{font-size:11px;color:#666;text-align:left;padding:4px 6px;border-bottom:1px solid #eee;font-weight:400}
-td{padding:5px 6px;border-bottom:1px solid #eee;color:#111;vertical-align:top}
-tr:last-child td{border-bottom:none}
-tr.unpaid{opacity:0.45}
-.badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:5px;font-weight:500;white-space:nowrap;margin:1px}
-.badge.dag{background:#f0f0f0;color:#555}
-.badge.natt{background:#e8f0fe;color:#1a56db}
-.badge.helg{background:#fef3c7;color:#92400e}
-.badge.heilag{background:#fce8f3;color:#9b2c74}
-.badge.ot50{background:#e6f4ea;color:#1e6e3a}
-.badge.ot100{background:#fde8e8;color:#9b1c1c}
-.badge.ubetferie{background:#eee;color:#999}
-.month-sel{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem}
-.month-btn{height:30px;padding:0 12px;font-size:12px}
-.month-btn.active{background:#111;color:#fff;border-color:#111}
-.info{font-size:12px;color:#888;margin-top:.75rem}
+input[type=number]{width:120px}
+input[type=text]:focus,input[type=number]:focus{border-color:var(--accent);outline:none}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{opacity:0.4}
+
+input[type=file]{font-size:13px;color:var(--text-2);width:100%}
+input[type=file]::file-selector-button{
+  background:var(--card-2);border:1px solid var(--border);
+  color:var(--text);height:34px;padding:0 12px;
+  border-radius:6px;font-size:13px;cursor:pointer;margin-right:10px;
+  font-family:inherit;font-weight:500;transition:all 0.15s ease;
+}
+input[type=file]::file-selector-button:hover{background:#1e2235;border-color:var(--accent)}
+
+button{
+  height:40px;padding:0 18px;border-radius:8px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--text-2);font-size:14px;font-weight:500;cursor:pointer;
+  font-family:inherit;transition:all 0.15s ease;
+}
+button:hover{background:#1e2235;color:var(--text)}
+
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500}
+.btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:#fff}
+
 .tabs{display:flex;gap:8px;margin-bottom:1rem}
-.tab{height:34px;padding:0 14px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:13px;cursor:pointer;color:#666}
-.tab.active{background:#111;color:#fff;border-color:#111}
-.sum-row td{font-weight:500;border-top:1px solid #ccc;border-bottom:none}
+.tab{flex:1;height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:13px;color:var(--text-2);cursor:pointer;font-family:inherit;font-weight:500;transition:all 0.15s ease}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:.75rem}
+.metric{background:var(--card-2);border-radius:10px;padding:.9rem 1rem;transition:all 0.15s ease}
+.metric .lbl{font-size:11px;color:var(--text-2);margin-bottom:6px}
+.metric .val{font-size:20px;font-weight:600;color:var(--text);font-family:'JetBrains Mono',monospace;letter-spacing:-0.01em}
+.metric-brutto{border-left:3px solid var(--accent)}
+.metric-netto{border-left:3px solid var(--ok)}
+.metric-netto .val{color:var(--ok)}
+.metric-overtid{border-left:3px solid var(--warn)}
+
+.status{font-size:13px;color:var(--text-2);margin-top:.5rem;min-height:20px}
+.status.err{color:var(--err)}
+.status.ok{color:var(--ok)}
+
+.info{font-size:12px;color:var(--text-2);margin-top:.75rem;line-height:1.5}
+
+.month-sel{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+.month-btn{height:32px;padding:0 12px;font-size:12px;background:var(--card-2);border:1px solid var(--border);color:var(--text-2);border-radius:6px;font-weight:500}
+.month-btn:hover{color:var(--text);background:#1e2235}
+.month-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.table-wrap{overflow-x:auto;margin-top:1rem;-webkit-overflow-scrolling:touch;border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;color:var(--text-2);text-align:left;padding:10px;border-bottom:1px solid var(--border);font-weight:500;text-transform:uppercase;letter-spacing:.04em;background:var(--card)}
+td{padding:9px 10px;color:var(--text);vertical-align:top}
+tbody tr{transition:background 0.15s ease}
+tbody tr:nth-child(odd){background:var(--card-2)}
+tbody tr:nth-child(even){background:transparent}
+tbody tr:hover{background:#1e2235}
+tr.unpaid{opacity:0.35;font-style:italic}
+tr.sum-row td{border-top:2px solid var(--accent);font-weight:600;color:var(--text);padding-top:11px;font-family:'JetBrains Mono',monospace}
+tr.sum-row{background:transparent !important}
+tr.sum-row:hover{background:transparent !important}
+
+.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;font-weight:500;white-space:nowrap;margin:1px;transition:all 0.15s ease}
+.badge.dag{background:#1e293b;color:#94a3b8}
+.badge.natt{background:#1e1b4b;color:#818cf8}
+.badge.natt::before{content:"🌙 "}
+.badge.helg{background:#1c1917;color:#fb923c}
+.badge.helg::before{content:"🏖 "}
+.badge.heilag{background:#2d1657;color:#c084fc}
+.badge.heilag::before{content:"⛪ "}
+.badge.ot50{background:#14290f;color:#4ade80}
+.badge.ot50::before{content:"⏱ "}
+.badge.ot100{background:#2d0f0f;color:#f87171}
+.badge.ot100::before{content:"⏱⏱ "}
+.badge.ubetferie{background:var(--card);color:#475569}
+.badge.ubetferie::before{content:"🚫 "}
+
+#resultCard{animation:fadeIn 0.3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+.footer{text-align:center;font-size:11px;color:var(--text-2);margin-top:2rem;padding:1rem 0;letter-spacing:0.02em}
+
+@media(max-width:767px){
+  .topbar{padding:0 1rem;gap:10px}
+  .topbar .subtitle{display:none}
+  .container{padding:1rem}
+  h1{font-size:20px;margin-bottom:1rem}
+  .layout{grid-template-columns:1fr;gap:0}
+  .col-left{position:static;gap:1rem;margin-bottom:1rem}
+  .card{padding:1.1rem 1.15rem}
+  .btn-primary{width:100%;height:48px;font-size:15px}
+  .tabs{gap:6px}
+  .tab{height:44px;font-size:14px}
+  .row label{min-width:auto;width:100%;margin-bottom:2px;flex:0 0 100%}
+  .row{margin-bottom:.9rem;gap:6px}
+  input[type=number]{width:100%}
+  .grid{grid-template-columns:repeat(2,1fr)}
+  table{min-width:600px}
+  .month-btn{height:36px;padding:0 14px}
+}
 </style>
 </head>
 <body>
-<h1>Lønnskalkulator — Vekter</h1>
+
+<header class="topbar">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  <span class="title">Lønnskalkulator</span>
+  <span class="subtitle">Vekter · Tariff 2025</span>
+</header>
+
+<div class="container">
+
+<h1>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  Lønnskalkulator — Vekter
+</h1>
+
+<div class="layout">
+
+<div class="col-left">
 
 <div class="card">
   <p class="slbl">Hent vakter</p>
@@ -59,7 +181,7 @@ tr.unpaid{opacity:0.45}
   </div>
   <div id="tabIcs">
     <div class="row"><input type="text" id="icsUrl" placeholder="https://…/ical/….ics"></div>
-    <button onclick="loadICS()">Hent vakter</button>
+    <button class="btn-primary" onclick="loadICS()">Hent vakter</button>
     <p class="info">Lim inn iCal-lenkje frå Optima eller Google Calendar.</p>
   </div>
   <div id="tabFile" style="display:none">
@@ -78,6 +200,10 @@ tr.unpaid{opacity:0.45}
   <div class="row"><label>Skatteprosent (%)</label><input type="number" id="rSkatt" value="30" step="0.5" min="0" max="60" oninput="recalc()"></div>
 </div>
 
+</div>
+
+<div class="col-right">
+
 <div class="card" id="resultCard" style="display:none">
   <p class="slbl">Resultat</p>
   <div class="month-sel" id="monthSel"></div>
@@ -86,17 +212,25 @@ tr.unpaid{opacity:0.45}
     <div class="metric"><p class="lbl">Timar totalt</p><p class="val" id="rTimer">–</p></div>
     <div class="metric"><p class="lbl">Grunnlønn</p><p class="val" id="rGrunn">–</p></div>
     <div class="metric"><p class="lbl">Tillegg</p><p class="val" id="rTillegg">–</p></div>
-    <div class="metric"><p class="lbl">Overtid</p><p class="val" id="rOvertid">–</p></div>
-    <div class="metric" style="border:1px solid #ccc"><p class="lbl">Brutto</p><p class="val" id="rTotal">–</p></div>
-    <div class="metric" style="border:1px solid #27ae60"><p class="lbl">Netto (est.)</p><p class="val" id="rNetto" style="color:#1e6e3a">–</p></div>
+    <div class="metric metric-overtid"><p class="lbl">Overtid</p><p class="val" id="rOvertid">–</p></div>
+    <div class="metric metric-brutto"><p class="lbl">Brutto</p><p class="val" id="rTotal">–</p></div>
+    <div class="metric metric-netto"><p class="lbl">Netto (est.)</p><p class="val" id="rNetto">–</p></div>
   </div>
-  <div style="overflow-x:auto">
+  <div class="table-wrap">
   <table>
     <thead><tr><th>Dato</th><th>Namn</th><th>Start</th><th>Slutt</th><th>Timar</th><th>Type</th><th>Lønn</th></tr></thead>
     <tbody id="shiftBody"></tbody>
   </table>
   </div>
   <p class="info">* Brutto før skatt. Heilagdag = overtid 100% (grunnlønn + 100% tillegg). Overtid over 41t/veke: +50% kvardag, +100% helg/heilagdag.</p>
+</div>
+
+</div>
+
+</div>
+
+<p class="footer">Powered by Vekteroverenskomsten 2024–2026</p>
+
 </div>
 
 <script>
