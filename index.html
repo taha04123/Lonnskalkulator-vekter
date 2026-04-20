@@ -380,20 +380,22 @@ function isNight(dt){
   return h>=21||h<6;
 }
 
-// Classify each minute of a shift, return breakdown.
-// Priority: heilag overrides helg (exclusive). Heilag does NOT override natt — both can apply.
-// Helg overrides natt. Invariant: heilag + helg + dag + nattExclusive = shiftH.
-// natt counts both nattExclusive and heilag∩natt overlap, so heilag+helg+natt+dag may exceed shiftH.
+// Classify each minute of a shift. Stacking rules (§5.5):
+// - heilag + natt stack (heilagNatt bucket)
+// - heilag overrides helg
+// - helg overrides natt (no nattillegg on helg)
+// - natt alone stands
+// Invariant: heilagDag + heilagNatt + helg + natt + dag = shiftH.
 function classifyMinutes(start,end,holidayWindows){
-  let heilag=0,helg=0,natt=0,dag=0;
+  let heilagDag=0,heilagNatt=0,helg=0,natt=0,dag=0;
   let cur=new Date(start);
   while(cur<end){
     const h=!!isInHolidayWindow(cur,holidayWindows);
     const w=isWeekend(cur);
     const n=isNight(cur);
     if(h){
-      heilag+=1;
-      if(n) natt+=1;
+      if(n) heilagNatt+=1;
+      else heilagDag+=1;
     }else if(w){
       helg+=1;
     }else if(n){
@@ -403,7 +405,7 @@ function classifyMinutes(start,end,holidayWindows){
     }
     cur=new Date(cur.getTime()+60000);
   }
-  return{heilag:heilag/60,helg:helg/60,natt:natt/60,dag:dag/60};
+  return{heilagDag:heilagDag/60,heilagNatt:heilagNatt/60,helg:helg/60,natt:natt/60,dag:dag/60};
 }
 
 function getWeekKey(d){
@@ -521,13 +523,15 @@ function recalc(){
 
     const yr=s.start.getFullYear();
     const hw=getHolidayWindows(yr);
-    const{heilag,helg,natt,dag}=classifyMinutes(s.start,s.end,hw);
+    const{heilagDag,heilagNatt,helg,natt,dag}=classifyMinutes(s.start,s.end,hw);
+    const heilag=heilagDag+heilagNatt;
+    const nattAll=natt+heilagNatt;
 
     // Base pay
     const grunn=shiftH*rBase;
 
-    // Ubekvem tillegg (natt og helg kun)
-    const tillegg=natt*rNatt+helg*rHelg;
+    // Tillegg: nattillegg på rein natt og heilag+natt. Helg absorberar natt. Heilag overstyrer helg.
+    const tillegg=nattAll*rNatt+helg*rHelg;
 
     // Heilagdag 100% tillegg brukar rHeilag (§5.5d, fast divisor 162.5)
     const heilagOt=heilag*rHeilag*1.0;
@@ -554,7 +558,7 @@ function recalc(){
 
     const lon=grunn+tillegg+heilagOt+otPay;
     totH+=shiftH; totGrunn+=grunn; totTillegg+=tillegg; totOvertid+=heilagOt+otPay;
-    totNattH+=natt; totNattKr+=natt*rNatt;
+    totNattH+=nattAll; totNattKr+=nattAll*rNatt;
     totHelgH+=helg; totHelgKr+=helg*rHelg;
     totHeilagH+=heilag; totHeilagKr+=heilag*rHeilag;
     totOtH+=otH; totOtKr+=otPay;
@@ -562,7 +566,7 @@ function recalc(){
     // Badges
     const badges=[];
     if(dag>0) badges.push('<span class="badge dag">dag</span>');
-    if(natt>0) badges.push('<span class="badge natt">natt</span>');
+    if(nattAll>0) badges.push('<span class="badge natt">natt</span>');
     if(helg>0) badges.push('<span class="badge helg">helg</span>');
     if(otDag>0) badges.push('<span class="badge ot50">overtid 50%</span>');
     if(heilag>0||otHeilag+otHelg>0) badges.push('<span class="badge ot100">overtid 100%</span>');
@@ -570,12 +574,12 @@ function recalc(){
     const tr=document.createElement('tr');
     const nameCell=s.sum+(s.manual?' <span class="badge manuell">manuell</span>':'');
     const rmCell=s.manual?`<button class="remove-btn" onclick="event.stopPropagation();removeShift(${s.id})" title="Fjern">×</button>`:'';
-    tr.innerHTML=`<td>${dato}</td><td>${nameCell}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">${h1(natt)}</td><td class="hide-mobile">${h1(helg)}</td><td class="hide-mobile">${h1(heilag)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td><td>${rmCell}</td>`;
+    tr.innerHTML=`<td>${dato}</td><td>${nameCell}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td class="hide-mobile">${h1(nattAll)}</td><td class="hide-mobile">${h1(helg)}</td><td class="hide-mobile">${h1(heilag)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td><td>${rmCell}</td>`;
     tr.dataset.idx=idx;
     tr.onclick=()=>openDetail(idx);
     shiftDetails.set(idx,{
       sum:s.sum,start:s.start,end:s.end,
-      shiftH,natt,helg,heilag,dag,
+      shiftH,heilagDag,heilagNatt,helg,natt,dag,
       otH,otDag,otHelg,otHeilag,
       rBase,rNatt,rHelg,rHeilag,
       grunn,tillegg,heilagOt,otPay,lon
@@ -623,9 +627,10 @@ function openDetail(idx){
   const rate=n=>'kr '+n.toFixed(2).replace('.',',')+'/t';
   const rows=[];
   rows.push(`<tr><td>Grunnlønn</td><td>${h1(d.shiftH)}</td><td>${rate(d.rBase)}</td><td>${fmt(d.grunn)}</td></tr>`);
+  if(d.heilagDag>0) rows.push(`<tr><td>Heilagdag</td><td>${h1(d.heilagDag)}</td><td>${rate(d.rHeilag)}</td><td>${fmt(d.heilagDag*d.rHeilag)}</td></tr>`);
+  if(d.heilagNatt>0) rows.push(`<tr><td>Heilagdag + natt</td><td>${h1(d.heilagNatt)}</td><td>${rate(d.rHeilag+d.rNatt)}</td><td>${fmt(d.heilagNatt*(d.rHeilag+d.rNatt))}</td></tr>`);
   if(d.natt>0) rows.push(`<tr><td>Natt (21–06)</td><td>${h1(d.natt)}</td><td>${rate(d.rNatt)}</td><td>${fmt(d.natt*d.rNatt)}</td></tr>`);
   if(d.helg>0) rows.push(`<tr><td>Helg</td><td>${h1(d.helg)}</td><td>${rate(d.rHelg)}</td><td>${fmt(d.helg*d.rHelg)}</td></tr>`);
-  if(d.heilag>0) rows.push(`<tr><td>Heilagdag</td><td>${h1(d.heilag)}</td><td>${rate(d.rHeilag)}</td><td>${fmt(d.heilag*d.rHeilag)}</td></tr>`);
   if(d.otDag>0) rows.push(`<tr><td>Overtid 50%</td><td>${h1(d.otDag)}</td><td>+50%</td><td>${fmt(d.otDag*d.rBase*0.5)}</td></tr>`);
   const ot100H=d.otHeilag+d.otHelg;
   if(ot100H>0) rows.push(`<tr><td>Overtid 100%</td><td>${h1(ot100H)}</td><td>+100%</td><td>${fmt(d.otHelg*d.rBase+d.otHeilag*d.rHeilag)}</td></tr>`);
