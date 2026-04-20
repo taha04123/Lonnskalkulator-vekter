@@ -292,11 +292,13 @@ function recalc(){
     // Base pay
     const grunn=shiftH*rBase;
 
-    // Ubekvem tillegg
-    const tillegg=natt*rNatt+helg*rHelg+heilag*rBase; // heilagdag = 100% av rBase
+    // Ubekvem tillegg (natt og helg kun)
+    const tillegg=natt*rNatt+helg*rHelg;
 
-    // Overtime pay (simplified: apply OT rate to last OT hours of shift)
-    // Determine if OT hours are on heilag/helg or regular
+    // Heilagdag = overtid 100% (i tillegg til grunnlønn)
+    const heilagOt=heilag*rBase*1.0;
+
+    // Vekeovertid: timar over grensa
     const heilagFraction=heilag/shiftH;
     const helgFraction=helg/shiftH;
     const otHeilag=otH*heilagFraction;
@@ -304,8 +306,8 @@ function recalc(){
     const otDag=otH-otHeilag-otHelg;
     const otPay=otDag*rBase*0.5+(otHeilag+otHelg)*rBase*1.0;
 
-    const lon=grunn+tillegg+otPay;
-    totH+=shiftH; totGrunn+=grunn; totTillegg+=tillegg; totOvertid+=otPay;
+    const lon=grunn+tillegg+heilagOt+otPay;
+    totH+=shiftH; totGrunn+=grunn; totTillegg+=tillegg; totOvertid+=heilagOt+otPay;
 
     // Badges
     const badges=[];
