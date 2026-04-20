@@ -96,7 +96,7 @@ tr.unpaid{opacity:0.45}
     <tbody id="shiftBody"></tbody>
   </table>
   </div>
-  <p class="info">* Brutto før skatt. Heilagdagstillegg = 100% av begynnerlønn (kr 248,99/t). Overtid over 41t/veke: +50% kvardag, +100% helg/heilagdag.</p>
+  <p class="info">* Brutto før skatt. Heilagdag = overtid 100% (grunnlønn + 100% tillegg). Overtid over 41t/veke: +50% kvardag, +100% helg/heilagdag.</p>
 </div>
 
 <script>
@@ -314,9 +314,8 @@ function recalc(){
     if(dag>0) badges.push('<span class="badge dag">dag</span>');
     if(natt>0) badges.push('<span class="badge natt">natt</span>');
     if(helg>0) badges.push('<span class="badge helg">helg</span>');
-    if(heilag>0) badges.push('<span class="badge heilag">heilagdag</span>');
     if(otDag>0) badges.push('<span class="badge ot50">overtid 50%</span>');
-    if(otHeilag+otHelg>0) badges.push('<span class="badge ot100">overtid 100%</span>');
+    if(heilag>0||otHeilag+otHelg>0) badges.push('<span class="badge ot100">overtid 100%</span>');
 
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${dato}</td><td>${s.sum}</td><td>${tS}</td><td>${tE}</td><td>${fmtH(shiftH)}</td><td>${badges.join('')}</td><td>${fmt(lon)}</td>`;
